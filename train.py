@@ -98,7 +98,7 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
             epoch_angle_loss /= len(loader)
             epoch_iou_loss /= len(loader)
             print(f'\n\033[{color}m {epoch}/{max_epoch} {stage}: '
-                  f'Mean loss: {epoch_loss / len(loader):.4f}, '
+                  f'Mean loss: {epoch_loss:.4f}, '
                   f'Cls loss: {epoch_cls_loss:.4f}, '
                   f'Angle loss: {epoch_angle_loss:.4f}, '
                   f'IoU loss: {epoch_iou_loss:.4f} | '
