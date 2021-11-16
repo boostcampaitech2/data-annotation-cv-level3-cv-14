@@ -435,6 +435,7 @@ class SceneTextDataset_Ex(Dataset):
         image = transformed['image']
         word_bboxes = transformed['word_bboxes']
 
+        vertices = np.reshape(word_bboxes, (-1, 8))
         roi_mask = generate_roi_mask(image, vertices, labels)
 
         return image, word_bboxes, roi_mask
