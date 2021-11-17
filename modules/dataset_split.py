@@ -2,11 +2,21 @@ import json
 import random
 random.seed(7)
 
-sourceFile = '../input/data/ICDAR17_Korean/ufo/train.json'
-targetDir = '../input/data/ICDAR17_Korean/ufo/'
+sourceFile1 = '../../input/data/ICDAR17_Korean/ufo/train.json'
+sourceFile2 = '../../input/data/Camper_Data/ufo/annotation.json'
+sourceFile3 = '../../input/data/ReposData/ufo/ufoannotation.json'
 
-with open(sourceFile,'r') as f:
+targetDir = '../../input/data/'
+
+with open(sourceFile1,'r') as f:
     jsonData_All = json.load(f)
+with open(sourceFile2,'r') as f:
+    jsonData2 = json.load(f)
+with open(sourceFile3,'r') as f:
+    jsonData3 = json.load(f)
+
+jsonData_All['images'].update(jsonData2['images'])
+jsonData_All['images'].update(jsonData3['images'])
 
 imageNames = list(jsonData_All["images"].keys())
 random.shuffle(imageNames)
