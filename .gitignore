@@ -1,1 +1,3 @@
 **/*.pth
+.gitignore
+.ipynb_checkpoints
