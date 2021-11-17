@@ -16,14 +16,16 @@ from east_dataset import EASTDataset
 from dataset import SceneTextDataset_Ex as SceneTextDataset
 from model import EAST
 
+import wandb
+
 def parse_args():
     parser = ArgumentParser()
 
     # Conventional args
+    parser.add_argument('--exp_name',type=str,default='exp1')
     parser.add_argument('--data_dir', type=str,
-                        default=os.environ.get('SM_CHANNEL_TRAIN', '../input/data/ICDAR17_Korean'))
-    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_MODEL_DIR',
-                                                                        'trained_models'))
+                        default=os.environ.get('SM_CHANNEL_TRAIN', '../../input/data/ICDAR17_Korean'))
+    parser.add_argument('--model_dir', type=str, default='../../models/trained_models')
 
     parser.add_argument('--device', default='cuda' if cuda.is_available() else 'cpu')
     parser.add_argument('--num_workers', type=int, default=4)
@@ -43,7 +45,7 @@ def parse_args():
     return args
 
 
-def do_training(data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
+def do_training(exp_name, data_dir, model_dir, device, image_size, input_size, num_workers, batch_size,
                 learning_rate, max_epoch, save_interval):
     dataset = SceneTextDataset(data_dir, split='split_train', image_size=image_size, crop_size=input_size)
     dataset = EASTDataset(dataset)
@@ -62,7 +64,10 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
 
     best_loss = 999
     for epoch in range(max_epoch):
-
+        #wandb log lr
+        wandb.log({
+            'config/lr': optimizer.param_groups[0]["lr"]
+        })
         for stage in ['train', 'valid']:
             if stage == 'train':
                 model.train()
@@ -82,13 +87,19 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
-
+                    #wandb train log
+                    wandb.log({
+                        'train/loss': loss.item(),
+                        'train/Cls loss': extra_info['cls_loss'],
+                        'train/Angle loss': extra_info['angle_loss'],
+                        'train/IoU loss': extra_info['iou_loss']
+                        })
                 elif stage == 'valid':
                     with torch.no_grad():
                         loss, extra_info = model.train_step(img, gt_score_map, gt_geo_map, roi_mask)
+                    #wandb valid log
 
                 epoch_loss += loss.item()
-
                 epoch_cls_loss += extra_info['cls_loss']
                 epoch_angle_loss += extra_info['angle_loss']
                 epoch_iou_loss += extra_info['iou_loss']
@@ -105,6 +116,12 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                   f'Elapsed time: {timedelta(seconds=time.time() - epoch_start)}' + '\033[0m')
 
             if stage == 'valid':
+                wandb.log({
+                        'valid/loss': epoch_loss,
+                        'valid/Cls loss': epoch_cls_loss,
+                        'valid/Angle loss': epoch_angle_loss,
+                        'valid/IoU loss': epoch_iou_loss,
+                        })
                 # Best score 모델 저장
                 if epoch_loss < best_loss:
                     if not osp.exists(model_dir):
@@ -112,14 +129,14 @@ def do_training(data_dir, model_dir, device, image_size, input_size, num_workers
                     ckpt_fpath = osp.join(model_dir, 'latest.pth')
                     torch.save(model.state_dict(), ckpt_fpath)
                     print(f"Best performance at epoch: {epoch}, Save model in {ckpt_fpath}")
-                    best_loss = epoch_loss
+                    best_loss = epoch_loss                
 
         scheduler.step()
 
 
 
-
 def main(args):
+    wandb.init(project='OCR text detection',name=args.exp_name,config=args)
     do_training(**args.__dict__)
 
 
