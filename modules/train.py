@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument('--exp_name',type=str,default='exp1')
     parser.add_argument('--data_dir', type=str,
                         default=os.environ.get('SM_CHANNEL_TRAIN', '../../input/data/ICDAR17_Korean'))
-    parser.add_argument('--model_dir', type=str, default='../../models/trained_models')
+    parser.add_argument('--model_dir', type=str, default=os.environ.get('SM_CHANNEL_MODEL', 'trained_models'))
 
     parser.add_argument('--device', default='cuda' if cuda.is_available() else 'cpu')
     parser.add_argument('--num_workers', type=int, default=4)
@@ -87,13 +87,7 @@ def do_training(exp_name, data_dir, model_dir, device, image_size, input_size, n
                     optimizer.zero_grad()
                     loss.backward()
                     optimizer.step()
-                    #wandb train log
-                    wandb.log({
-                        'train/loss': loss.item(),
-                        'train/Cls loss': extra_info['cls_loss'],
-                        'train/Angle loss': extra_info['angle_loss'],
-                        'train/IoU loss': extra_info['iou_loss']
-                        })
+                    
                 elif stage == 'valid':
                     with torch.no_grad():
                         loss, extra_info = model.train_step(img, gt_score_map, gt_geo_map, roi_mask)
@@ -114,8 +108,15 @@ def do_training(exp_name, data_dir, model_dir, device, image_size, input_size, n
                   f'Angle loss: {epoch_angle_loss:.4f}, '
                   f'IoU loss: {epoch_iou_loss:.4f} | '
                   f'Elapsed time: {timedelta(seconds=time.time() - epoch_start)}' + '\033[0m')
-
-            if stage == 'valid':
+            if stage == 'train':
+                #wandb train log
+                wandb.log({
+                    'train/loss': epoch_loss,
+                    'train/Cls loss': epoch_cls_loss,
+                    'train/Angle loss':epoch_angle_loss,
+                    'train/IoU loss': epoch_iou_loss
+                    })
+            elif stage == 'valid':
                 wandb.log({
                         'valid/loss': epoch_loss,
                         'valid/Cls loss': epoch_cls_loss,
@@ -126,7 +127,7 @@ def do_training(exp_name, data_dir, model_dir, device, image_size, input_size, n
                 if epoch_loss < best_loss:
                     if not osp.exists(model_dir):
                         os.makedirs(model_dir)
-                    ckpt_fpath = osp.join(model_dir, 'latest.pth')
+                    ckpt_fpath = osp.join(model_dir, exp_name+'latest.pth')
                     torch.save(model.state_dict(), ckpt_fpath)
                     print(f"Best performance at epoch: {epoch}, Save model in {ckpt_fpath}")
                     best_loss = epoch_loss                

@@ -15,8 +15,12 @@ with open(sourceFile2,'r') as f:
 with open(sourceFile3,'r') as f:
     jsonData3 = json.load(f)
 
+print(len(jsonData_All['images']))
 jsonData_All['images'].update(jsonData2['images'])
+print(len(jsonData_All['images']))
 jsonData_All['images'].update(jsonData3['images'])
+print(len(jsonData_All['images']))
+#jsonData_All = jsonData3
 
 imageNames = list(jsonData_All["images"].keys())
 random.shuffle(imageNames)

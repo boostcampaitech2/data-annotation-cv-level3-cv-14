@@ -335,6 +335,18 @@ def filter_vertices(vertices, labels, ignore_under=0, drop_under=0):
     return new_vertices, new_labels
 
 
+def parse_vertices(vertices):
+    n_pts = len(vertices)
+    assert n_pts % 2 == 0, 'Wrong points! It has odd vertices.'
+    vertices = np.array(vertices)
+    return [
+        np.vstack(
+            [vertices[idx:idx + 2],
+             vertices[n_pts - 2 - idx:n_pts - idx]]).flatten()
+        for idx in range(int(n_pts / 2) - 1)
+    ]
+
+
 class SceneTextDataset(Dataset):
     def __init__(self, root_dir, split='train', image_size=1024, crop_size=512, color_jitter=True,
                  normalize=True):
@@ -390,7 +402,7 @@ class SceneTextDataset(Dataset):
 class SceneTextDataset_Ex(Dataset):
     def __init__(self, root_dir, split='train', image_size=1024, crop_size=512, color_jitter=True,
                  normalize=True):
-        with open(osp.join(root_dir, 'ufo/{}.json'.format(split)), 'r') as f:
+        with open(osp.join(root_dir, '{}.json'.format(split)), 'r') as f:
             anno = json.load(f)
 
         self.anno = anno
@@ -409,17 +421,20 @@ class SceneTextDataset_Ex(Dataset):
 
         vertices, labels = [], []
         for word_info in self.anno['images'][image_fname]['words'].values():
-            vertices.append(np.array(word_info['points']).flatten())
-            labels.append(int(not word_info['illegibility']))
+            #vertices.append(np.array(word_info['points']).flatten())
+            #labels.append(int(not word_info['illegibility']))
+            parsed_vertices = parse_vertices(word_info['points'])
+            vertices.extend(parsed_vertices)
+            labels.extend([int(not word_info['illegibility'])]*len(parsed_vertices))
+        
         vertices, labels = np.array(vertices, dtype=np.float32), np.array(labels, dtype=np.int64)
-
         vertices, labels = filter_vertices(vertices, labels, ignore_under=10, drop_under=1)
 
         image = Image.open(image_fpath)
         image, vertices = resize_img(image, vertices, self.image_size)
         image, vertices = adjust_height(image, vertices)
-        image, vertices = rotate_img(image, vertices)
-        image, vertices = crop_img(image, vertices, labels, self.crop_size)
+        #image, vertices = rotate_img(image, vertices)
+        #image, vertices = crop_img(image, vertices, labels, self.crop_size)
 
         if image.mode != 'RGB':
             image = image.convert('RGB')
