@@ -1,3 +1,9 @@
+"""
+Validation Set의 Inference Output을 도출
+- trained_models 폴더 아래에 학습된 모델(latest.pth)이 있어야함
+예시 :
+`python Inference_valid.py --exp_name {실험 이름}`
+"""
 import os
 import os.path as osp
 import json

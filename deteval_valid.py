@@ -1,6 +1,18 @@
+"""
+Validation Set의 Inference Output으로 F1 Score, Recall, Precision을 계산
+- Inference_valid.py로 predictions폴더 아래에 '{exp_name}_output.csv'를 먼저 생성해야함.
+예시 :
+`python deteval_valid.py --exp_name {실험 이름}`
+"""
 import math
 from collections import namedtuple
 from copy import deepcopy
+from pathlib import Path
+import pandas as pd
+import json
+from argparse import ArgumentParser
+import os
+import os.path as osp
 
 import numpy as np
 
@@ -349,22 +361,32 @@ def calc_deteval_metrics(pred_bboxes_dict, gt_bboxes_dict, transcriptions_dict=N
 
     return resDict
 
+def read_json(filename):
+    with Path(filename).open(encoding='utf8') as handle:
+        ann = json.load(handle)
+    return ann
 
-if __name__ == '__main__':
-    from pathlib import Path
-    import pandas as pd
-    import json
-    def read_json(filename):
-        with Path(filename).open(encoding='utf8') as handle:
-            ann = json.load(handle)
-        return ann
+def parse_args():
+    parser = ArgumentParser()
+    
+    # Conventional args
+    parser.add_argument('--data_dir', default=os.environ.get('SM_CHANNEL_EVAL', '../input/data/ICDAR17_Korean'))
+    parser.add_argument('--model_dir', default=os.environ.get('SM_CHANNEL_MODEL', 'trained_models'))
+    parser.add_argument('--exp_name', type=str, default='Baseline')
+    parser.add_argument('--output_dir', default=os.environ.get('SM_OUTPUT_DATA_DIR', 'predictions'))
 
-    output = read_json("/opt/ml/code/predictions/Aug8_output.csv")
-    valid_data = read_json("/opt/ml/input/data/ICDAR17_Korean/ufo/split_valid.json")
+    args = parser.parse_args()
+
+    return args
+
+def main(args):
+    
+    output = read_json(osp.join(args.output_dir, f'{args.exp_name}_output.csv'))
+    valid_data = read_json(osp.join(args.data_dir,"ufo/split_valid.json"))
+    # 예측된 bbox 정보를 dict 형태로
     pred_bboxes_dict = dict()
-    # 예측한 bbox 가공
-    for sample_name, rest in output['images'].items():
-        points_info = pd.DataFrame(rest['words']).T # 예측된 bbox
+    for sample_name, bbox_info in output['images'].items():
+        points_info = pd.DataFrame(bbox_info['words']).T # 예측된 bbox
 
         if points_info.empty: 
             # 예측된 bbox가 없는 경우는 빈 리스트로 할당
@@ -372,14 +394,14 @@ if __name__ == '__main__':
         else:
             pred_bboxes_dict[sample_name] = list(points_info['points'])
     
-    # gt bbox 가공
+    # gt bbox 정보를 dict 형태로
     gt_bboxes_dict = dict()
     transcriptions_dict = dict()
-    for sample_name, rest in valid_data['images'].items():
-        points_info = pd.DataFrame(rest['words']).T # 예측된 bbox
+    for sample_name, bbox_info in valid_data['images'].items():
+        points_info = pd.DataFrame(bbox_info['words']).T 
 
         if points_info.empty: 
-            # 예측된 bbox가 없는 경우는 빈 리스트로 할당
+            # gt bbox가 없는 경우는 빈 리스트로 할당
             gt_bboxes_dict[sample_name] = []
         else:
             gt_bboxes_dict[sample_name] = list(points_info['points'])
@@ -389,11 +411,13 @@ if __name__ == '__main__':
     
     temp = calc_deteval_metrics(pred_bboxes_dict, gt_bboxes_dict, transcriptions_dict=transcriptions_dict,
                          eval_hparams=None, bbox_format='rect', verbose=False)
-    print(temp.keys())
-    # print(temp['calculated'])
-    # print(temp['Message'])
-    print(temp['total'])
-    # print(temp['per_sample'])
-    # print(temp['eval_hparams'])
+    
+    print(temp['total']) # precision, recall, f1score 출력
+
+
+if __name__ == '__main__':
+    args = parse_args()
+    main(args)
+    
           
     
